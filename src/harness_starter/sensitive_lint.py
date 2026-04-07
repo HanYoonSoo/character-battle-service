@@ -104,31 +104,15 @@ def _iter_text_files(repo_root: Path) -> list[Path]:
         candidates: list[Path] = []
         for relative_path in indexed_paths:
             path = repo_root / relative_path
-            if not path.exists() or not path.is_file():
-                continue
-            if set(relative_path.parts) & IGNORED_DIR_NAMES:
-                continue
-            if path.stat().st_size > MAX_TEXT_FILE_BYTES:
-                continue
-            try:
-                path.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            if not _is_scannable_text_file(path=path, relative_parts=relative_path.parts):
                 continue
             candidates.append(path)
         return sorted(candidates)
 
     candidates: list[Path] = []
     for path in sorted(repo_root.rglob("*")):
-        if not path.is_file():
-            continue
-        relative_parts = set(path.relative_to(repo_root).parts)
-        if relative_parts & IGNORED_DIR_NAMES:
-            continue
-        if path.stat().st_size > MAX_TEXT_FILE_BYTES:
-            continue
-        try:
-            path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+        relative_parts = path.relative_to(repo_root).parts
+        if not _is_scannable_text_file(path=path, relative_parts=relative_parts):
             continue
         candidates.append(path)
     return candidates
@@ -147,3 +131,17 @@ def _list_git_index_paths(repo_root: Path) -> list[Path] | None:
     if not completed.stdout:
         return []
     return [Path(raw.decode("utf-8")) for raw in completed.stdout.split(b"\x00") if raw]
+
+
+def _is_scannable_text_file(*, path: Path, relative_parts: tuple[str, ...]) -> bool:
+    if not path.exists() or not path.is_file():
+        return False
+    if set(relative_parts) & IGNORED_DIR_NAMES:
+        return False
+    if path.stat().st_size > MAX_TEXT_FILE_BYTES:
+        return False
+    try:
+        path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
