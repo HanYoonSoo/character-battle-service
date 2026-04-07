@@ -1,0 +1,2 @@
+"""Character battle backend package."""
+
