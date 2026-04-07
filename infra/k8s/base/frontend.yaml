@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: character-battle-frontend:latest
+          image: REPLACE_WITH_NODE_IP:30084/character-battle-frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
