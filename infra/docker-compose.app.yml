@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ../backend
+    container_name: character-battle-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql+psycopg://app:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-character_battle}"
+      REDIS_URL: "redis://redis:6379/0"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-replace_me}"
+      DATABASE_AUTO_CREATE: "${DATABASE_AUTO_CREATE:-true}"
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+
+  frontend:
+    build:
+      context: ../frontend
+    container_name: character-battle-frontend
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_HOST_PORT:-13000}:80"
