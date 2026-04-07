@@ -14,7 +14,7 @@ from harness_starter.repair import (
     run_auto_repair,
     run_deterministic_gates,
 )
-from harness_starter.repo_ops import REPO_ROOT
+from harness_starter.repo_ops import REPO_ROOT, command_to_display
 from harness_starter.rule_promotion import (
     build_rule_candidates,
     render_rule_candidates_json,
@@ -93,6 +93,14 @@ def main() -> int:
                 print(f"{result.name}: {'PASS' if result.passed else 'FAIL'}")
                 if not result.passed:
                     print(result.summary)
+                    if result.command:
+                        print(f"command: {command_to_display(result.command)}")
+                    if result.stdout.strip():
+                        print("stdout:")
+                        print(result.stdout.rstrip())
+                    if result.stderr.strip():
+                        print("stderr:")
+                        print(result.stderr.rstrip())
         return 0 if all(result.passed for result in results) else 1
 
     if args.command == "hygiene":
