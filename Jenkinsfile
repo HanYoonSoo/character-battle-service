@@ -3,23 +3,35 @@ pipeline {
 
   options {
     disableConcurrentBuilds()
-    timestamps()
   }
 
   environment {
     PYTHONPATH = 'src'
     UV_CACHE_DIR = "${WORKSPACE}/.cache/uv"
+
     REGISTRY = 'docker-registry.registry.svc.cluster.local:5000'
     FRONTEND_IMAGE = "${REGISTRY}/character-battle-frontend"
     BACKEND_IMAGE = "${REGISTRY}/character-battle-backend"
     IMAGE_TAG = "${BUILD_NUMBER}"
     K8S_NAMESPACE = 'character-battle'
+
+    REPO_URL = 'https://github.com/HanYoonSoo/character-battle-service.git'
+    KANIKO_IMAGE = 'gcr.io/kaniko-project/executor:v1.23.2'
   }
 
   stages {
     stage('Checkout') {
       steps {
         checkout scm
+      }
+    }
+
+    stage('Capture Commit') {
+      steps {
+        script {
+          env.SCM_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+          echo "SCM_COMMIT=${env.SCM_COMMIT}"
+        }
       }
     }
 
@@ -58,23 +70,114 @@ pipeline {
       }
     }
 
-    stage('Build Images') {
+    stage('Build & Push Images (Kaniko)') {
       steps {
-        sh 'docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} frontend'
-        sh 'docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} backend'
-      }
-    }
+        sh '''
+          set -euo pipefail
 
-    stage('Push Images') {
-      steps {
-        sh 'docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}'
-        sh 'docker push ${BACKEND_IMAGE}:${IMAGE_TAG}'
+          FRONT_JOB="kaniko-frontend-${BUILD_NUMBER}"
+          BACK_JOB="kaniko-backend-${BUILD_NUMBER}"
+
+          cat <<EOF | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${FRONT_JOB}
+  namespace: ${K8S_NAMESPACE}
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: ws
+          emptyDir: {}
+      initContainers:
+        - name: fetch-source
+          image: alpine/git:2.45.2
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              git clone ${REPO_URL} /workspace
+              cd /workspace
+              git checkout ${SCM_COMMIT}
+          volumeMounts:
+            - name: ws
+              mountPath: /workspace
+      containers:
+        - name: kaniko
+          image: ${KANIKO_IMAGE}
+          args:
+            - --context=dir:///workspace/frontend
+            - --dockerfile=/workspace/frontend/Dockerfile
+            - --destination=${FRONTEND_IMAGE}:${IMAGE_TAG}
+            - --insecure
+            - --skip-tls-verify
+          volumeMounts:
+            - name: ws
+              mountPath: /workspace
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${BACK_JOB}
+  namespace: ${K8S_NAMESPACE}
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: ws
+          emptyDir: {}
+      initContainers:
+        - name: fetch-source
+          image: alpine/git:2.45.2
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              git clone ${REPO_URL} /workspace
+              cd /workspace
+              git checkout ${SCM_COMMIT}
+          volumeMounts:
+            - name: ws
+              mountPath: /workspace
+      containers:
+        - name: kaniko
+          image: ${KANIKO_IMAGE}
+          args:
+            - --context=dir:///workspace/backend
+            - --dockerfile=/workspace/backend/Dockerfile
+            - --destination=${BACKEND_IMAGE}:${IMAGE_TAG}
+            - --insecure
+            - --skip-tls-verify
+          volumeMounts:
+            - name: ws
+              mountPath: /workspace
+EOF
+
+          kubectl -n ${K8S_NAMESPACE} wait --for=condition=complete job/${FRONT_JOB} --timeout=1800s || {
+            kubectl -n ${K8S_NAMESPACE} logs job/${FRONT_JOB} --all-containers=true --tail=-1 || true
+            exit 1
+          }
+
+          kubectl -n ${K8S_NAMESPACE} wait --for=condition=complete job/${BACK_JOB} --timeout=1800s || {
+            kubectl -n ${K8S_NAMESPACE} logs job/${BACK_JOB} --all-containers=true --tail=-1 || true
+            exit 1
+          }
+
+          kubectl -n ${K8S_NAMESPACE} logs job/${FRONT_JOB} --all-containers=true --tail=200 || true
+          kubectl -n ${K8S_NAMESPACE} logs job/${BACK_JOB} --all-containers=true --tail=200 || true
+        '''
       }
     }
 
     stage('Deploy') {
       steps {
         sh '''
+          set -euo pipefail
           kubectl apply -k infra/k8s/base -n ${K8S_NAMESPACE}
 
           kubectl -n ${K8S_NAMESPACE} set image deployment/frontend \
@@ -102,6 +205,10 @@ pipeline {
 
   post {
     always {
+      sh '''
+        kubectl -n ${K8S_NAMESPACE} delete job kaniko-frontend-${BUILD_NUMBER} --ignore-not-found=true || true
+        kubectl -n ${K8S_NAMESPACE} delete job kaniko-backend-${BUILD_NUMBER} --ignore-not-found=true || true
+      '''
       archiveArtifacts artifacts: '.harness/**/*', allowEmptyArchive: true
     }
   }
