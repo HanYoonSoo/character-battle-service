@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harness-starter"
+version = "0.1.0"
+description = "Minimal harness engineering starter project"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+openai = ["openai>=1.0.0"]
+
+[project.scripts]
+harness-starter = "harness_starter.cli:main"
+harness-ops = "harness_starter.ops_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

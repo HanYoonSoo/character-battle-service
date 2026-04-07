@@ -1,0 +1,5 @@
+{"question": "What kind of site is this repository targeting?", "must_contain": ["character battle"], "must_cite": true}
+{"question": "Can a battle end in a draw?", "must_contain": ["exactly one winner"], "must_cite": true}
+{"question": "How should anonymous users be handled in v1?", "must_contain": ["session", "cookie"], "must_cite": true}
+{"question": "Which service should be publicly exposed by default?", "must_contain": ["frontend"], "must_cite": true}
+{"question": "What code patterns should be avoided?", "must_contain": ["duplicate", "one file"], "must_cite": true}
