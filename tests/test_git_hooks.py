@@ -50,7 +50,7 @@ class GitHookTests(unittest.TestCase):
 
             outcome = run_pre_commit_hook(repo_root=repo_root, max_attempts=1)
 
-            self.assertTrue(outcome.success)
+            self.assertTrue(outcome.success, outcome.to_dict())
             self.assertIn("normalize_text_file:README.md", outcome.applied_repairs)
             working_tree = readme_path.read_text(encoding="utf-8")
             index_copy = _git(repo_root, "show", ":README.md")
@@ -74,7 +74,7 @@ class GitHookTests(unittest.TestCase):
             with patch.dict(os.environ, {"HARNESS_REPAIR_COMMAND": "__not_a_real_command__"}, clear=False):
                 outcome = run_pre_commit_hook(repo_root=repo_root, max_attempts=1)
 
-            self.assertTrue(outcome.success)
+            self.assertTrue(outcome.success, outcome.to_dict())
             self.assertIn("normalize_text_file:README.md", outcome.applied_repairs)
 
 
@@ -119,7 +119,14 @@ def _write_minimal_repo(repo_root: Path) -> None:
         encoding="utf-8",
     )
 
-    (repo_root / "tests").mkdir()
+    tests_root = repo_root / "tests"
+    tests_root.mkdir()
+    (tests_root / "test_smoke.py").write_text(
+        "import unittest\n\n\nclass SmokeTest(unittest.TestCase):\n"
+        "    def test_ok(self) -> None:\n"
+        "        self.assertTrue(True)\n",
+        encoding="utf-8",
+    )
 
 
 def _git(repo_root: Path, *args: str) -> str:

@@ -37,7 +37,16 @@ pipeline {
 
     stage('Repository Harness') {
       steps {
-        sh 'python3 -m harness_starter.ops_cli gates'
+        sh '''
+          set +e
+          python3 -m harness_starter.ops_cli gates
+          HARNESS_RC=$?
+          if [ "${HARNESS_RC}" -ne 0 ]; then
+            echo "Repository harness failed. Dumping verbose unit test output for diagnostics."
+            python3 -m unittest discover -s tests -p "test_*.py" -v || true
+            exit "${HARNESS_RC}"
+          fi
+        '''
       }
     }
 

@@ -16,7 +16,7 @@ class RepairLoopTests(unittest.TestCase):
 
             outcome = run_auto_repair(repo_root=repo_root, max_attempts=1)
 
-            self.assertTrue(outcome.success)
+            self.assertTrue(outcome.success, outcome.to_dict())
             self.assertIn("ignore_harness_state", outcome.applied_repairs)
             gitignore_text = (repo_root / ".gitignore").read_text(encoding="utf-8")
             self.assertIn(".harness/", gitignore_text)
@@ -32,7 +32,7 @@ class RepairLoopTests(unittest.TestCase):
 
             outcome = run_auto_repair(repo_root=repo_root, max_attempts=1)
 
-            self.assertTrue(outcome.success)
+            self.assertTrue(outcome.success, outcome.to_dict())
             self.assertIn("normalize_text_file:README.md", outcome.applied_repairs)
             repaired_text = (repo_root / "README.md").read_text(encoding="utf-8")
             self.assertEqual(repaired_text, f"Run the tests with `{DOCUMENTED_TEST_COMMAND}`.\n")
@@ -90,7 +90,14 @@ def _write_minimal_repo(repo_root: Path, *, include_harness_ignore: bool) -> Non
         encoding="utf-8",
     )
 
-    (repo_root / "tests").mkdir()
+    tests_root = repo_root / "tests"
+    tests_root.mkdir()
+    (tests_root / "test_smoke.py").write_text(
+        "import unittest\n\n\nclass SmokeTest(unittest.TestCase):\n"
+        "    def test_ok(self) -> None:\n"
+        "        self.assertTrue(True)\n",
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":
