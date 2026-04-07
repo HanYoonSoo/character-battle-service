@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -48,7 +50,7 @@ def run_pre_commit_hook(repo_root: Path = REPO_ROOT, max_attempts: int = 2) -> R
 
     agent = CompositeRepairAgent(SafeFileRepairAgent())
     command = os.getenv("HARNESS_REPAIR_COMMAND")
-    if command:
+    if command and _command_is_resolvable(command):
         agent = CompositeRepairAgent(SafeFileRepairAgent(), ExternalCommandRepairAgent(command))
 
     outcome = run_auto_repair(repo_root=repo_root, agent=agent, max_attempts=max_attempts)
@@ -94,3 +96,13 @@ def _restage_paths(repo_root: Path, staged_paths: list[str]) -> None:
     )
     if restage.returncode != 0:
         raise RuntimeError(restage.stderr.strip() or "Failed to restage repaired files.")
+
+
+def _command_is_resolvable(command: str) -> bool:
+    parts = shlex.split(command)
+    if not parts:
+        return False
+    binary = parts[0]
+    if "/" in binary:
+        return Path(binary).exists()
+    return shutil.which(binary) is not None

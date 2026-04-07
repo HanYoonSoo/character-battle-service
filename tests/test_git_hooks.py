@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from harness_starter.git_hooks import install_git_hooks, run_pre_commit_hook
 from harness_starter.hygiene import DOCUMENTED_TEST_COMMAND
@@ -54,6 +56,26 @@ class GitHookTests(unittest.TestCase):
             index_copy = _git(repo_root, "show", ":README.md")
             self.assertEqual(working_tree, index_copy)
             self.assertEqual(working_tree, f"Run the tests with `{DOCUMENTED_TEST_COMMAND}`.\n")
+
+    def test_pre_commit_ignores_unresolvable_external_repair_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            _init_git_repo(repo_root)
+            _write_minimal_repo(repo_root)
+            readme_path = repo_root / "README.md"
+            readme_path.write_text(
+                f"Run the tests with `{DOCUMENTED_TEST_COMMAND}`.  ",
+                encoding="utf-8",
+            )
+            _git(repo_root, "add", "README.md", "AGENTS.md", ".gitignore", "Jenkinsfile")
+            _git(repo_root, "add", "infra/k8s/base/kustomization.yaml", "infra/k8s/base/app-configmap.yaml")
+            _git(repo_root, "add", "src/harness_starter/__init__.py", "src/harness_starter/ops_cli.py", "src/harness_starter/hygiene.py")
+
+            with patch.dict(os.environ, {"HARNESS_REPAIR_COMMAND": "__not_a_real_command__"}, clear=False):
+                outcome = run_pre_commit_hook(repo_root=repo_root, max_attempts=1)
+
+            self.assertTrue(outcome.success)
+            self.assertIn("normalize_text_file:README.md", outcome.applied_repairs)
 
 
 def _init_git_repo(repo_root: Path) -> None:
