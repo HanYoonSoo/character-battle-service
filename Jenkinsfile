@@ -9,9 +9,14 @@ pipeline {
     PYTHONPATH = 'src'
     UV_CACHE_DIR = "${WORKSPACE}/.cache/uv"
 
-    REGISTRY = 'docker-registry.registry.svc.cluster.local:5000'
-    FRONTEND_IMAGE = "${REGISTRY}/character-battle-frontend"
-    BACKEND_IMAGE = "${REGISTRY}/character-battle-backend"
+    // Push is executed by in-cluster Kaniko jobs.
+    PUSH_REGISTRY = 'docker-registry.registry.svc.cluster.local:5000'
+    // Pull is executed by node runtime (kubelet/containerd). Set this to a node-reachable endpoint, e.g. 192.168.0.10:30084.
+    DEPLOY_REGISTRY = 'REPLACE_WITH_NODE_IP:30084'
+    FRONTEND_PUSH_IMAGE = "${PUSH_REGISTRY}/character-battle-frontend"
+    BACKEND_PUSH_IMAGE = "${PUSH_REGISTRY}/character-battle-backend"
+    FRONTEND_DEPLOY_IMAGE = "${DEPLOY_REGISTRY}/character-battle-frontend"
+    BACKEND_DEPLOY_IMAGE = "${DEPLOY_REGISTRY}/character-battle-backend"
     IMAGE_TAG = "${BUILD_NUMBER}"
     K8S_NAMESPACE = 'character-battle'
 
@@ -120,7 +125,7 @@ spec:
           args:
             - --context=dir:///workspace/frontend
             - --dockerfile=/workspace/frontend/Dockerfile
-            - --destination=${FRONTEND_IMAGE}:${IMAGE_TAG}
+            - --destination=${FRONTEND_PUSH_IMAGE}:${IMAGE_TAG}
             - --insecure
             - --skip-tls-verify
           volumeMounts:
@@ -159,7 +164,7 @@ spec:
           args:
             - --context=dir:///workspace/backend
             - --dockerfile=/workspace/backend/Dockerfile
-            - --destination=${BACKEND_IMAGE}:${IMAGE_TAG}
+            - --destination=${BACKEND_PUSH_IMAGE}:${IMAGE_TAG}
             - --insecure
             - --skip-tls-verify
           volumeMounts:
@@ -187,13 +192,17 @@ EOF
       steps {
         sh '''
           set -euo pipefail
+          if [ "${DEPLOY_REGISTRY}" = "REPLACE_WITH_NODE_IP:30084" ]; then
+            echo "DEPLOY_REGISTRY is not configured. Set it to a node-reachable registry endpoint."
+            exit 1
+          fi
           kubectl apply -k infra/k8s/base -n ${K8S_NAMESPACE}
 
           kubectl -n ${K8S_NAMESPACE} set image deployment/frontend \
-            frontend=${FRONTEND_IMAGE}:${IMAGE_TAG}
+            frontend=${FRONTEND_DEPLOY_IMAGE}:${IMAGE_TAG}
 
           kubectl -n ${K8S_NAMESPACE} set image deployment/backend \
-            backend=${BACKEND_IMAGE}:${IMAGE_TAG}
+            backend=${BACKEND_DEPLOY_IMAGE}:${IMAGE_TAG}
 
           kubectl -n ${K8S_NAMESPACE} rollout status deployment/frontend --timeout=180s
           kubectl -n ${K8S_NAMESPACE} rollout status deployment/backend --timeout=180s
