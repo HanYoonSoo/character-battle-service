@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  repository-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Run repository harness gates
+        env:
+          PYTHONPATH: src
+        run: python -m harness_starter.ops_cli gates
+
+  frontend-verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
+
+  backend-verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.3"
+          enable-cache: true
+      - name: Check backend lockfile
+        run: uv lock --check
+      - name: Sync backend dependencies
+        run: uv sync --locked
+      - name: Check backend dependency consistency
+        run: .venv/bin/pip check
+      - name: Compile backend application
+        run: uv run --locked python -m compileall app
+      - name: Import FastAPI app
+        run: uv run --locked python -c "from app.main import app; print(app.title)"

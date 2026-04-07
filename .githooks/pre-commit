@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+python3 -m harness_starter.ops_cli pre-commit --max-attempts 2
