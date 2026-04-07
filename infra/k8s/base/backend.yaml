@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: REPLACE_WITH_NODE_IP:30084/character-battle-backend:latest
+          image: 192.168.56.30:30084/character-battle-backend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000

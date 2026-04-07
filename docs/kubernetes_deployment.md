@@ -29,8 +29,8 @@ This fits the default Kubernetes NodePort range.
 
 Recommended image names:
 
-- `<NODE_IP>:30084/character-battle-frontend:latest`
-- `<NODE_IP>:30084/character-battle-backend:latest`
+- `192.168.56.30:30084/character-battle-frontend:latest`
+- `192.168.56.30:30084/character-battle-backend:latest`
 
 Do not leave image names without a registry prefix in deployment manifests.
 If a registry is omitted, Kubernetes pulls from Docker Hub by default.

@@ -11,12 +11,9 @@ pipeline {
 
     // Push is executed by in-cluster Kaniko jobs.
     PUSH_REGISTRY = 'docker-registry.registry.svc.cluster.local:5000'
-    // Pull is executed by node runtime (kubelet/containerd). Set this to a node-reachable endpoint, e.g. 192.168.0.10:30084.
-    DEPLOY_REGISTRY = 'REPLACE_WITH_NODE_IP:30084'
+    // Pull endpoint should be configured once in Jenkins global env var: DEPLOY_REGISTRY_DEFAULT
     FRONTEND_PUSH_IMAGE = "${PUSH_REGISTRY}/character-battle-frontend"
     BACKEND_PUSH_IMAGE = "${PUSH_REGISTRY}/character-battle-backend"
-    FRONTEND_DEPLOY_IMAGE = "${DEPLOY_REGISTRY}/character-battle-frontend"
-    BACKEND_DEPLOY_IMAGE = "${DEPLOY_REGISTRY}/character-battle-backend"
     IMAGE_TAG = "${BUILD_NUMBER}"
     K8S_NAMESPACE = 'character-battle'
 
@@ -192,17 +189,23 @@ EOF
       steps {
         sh '''
           set -euo pipefail
-          if [ "${DEPLOY_REGISTRY}" = "REPLACE_WITH_NODE_IP:30084" ]; then
-            echo "DEPLOY_REGISTRY is not configured. Set it to a node-reachable registry endpoint."
-            exit 1
+          DEPLOY_REGISTRY_EFFECTIVE="${DEPLOY_REGISTRY_DEFAULT:-}"
+          if [ -z "${DEPLOY_REGISTRY_EFFECTIVE}" ]; then
+            NODE_IP="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')"
+            if [ -z "${NODE_IP}" ]; then
+              echo "Failed to resolve node InternalIP for registry endpoint."
+              exit 1
+            fi
+            DEPLOY_REGISTRY_EFFECTIVE="${NODE_IP}:30084"
           fi
+          echo "Using deploy registry: ${DEPLOY_REGISTRY_EFFECTIVE}"
           kubectl apply -k infra/k8s/base -n ${K8S_NAMESPACE}
 
           kubectl -n ${K8S_NAMESPACE} set image deployment/frontend \
-            frontend=${FRONTEND_DEPLOY_IMAGE}:${IMAGE_TAG}
+            frontend=${DEPLOY_REGISTRY_EFFECTIVE}/character-battle-frontend:${IMAGE_TAG}
 
           kubectl -n ${K8S_NAMESPACE} set image deployment/backend \
-            backend=${BACKEND_DEPLOY_IMAGE}:${IMAGE_TAG}
+            backend=${DEPLOY_REGISTRY_EFFECTIVE}/character-battle-backend:${IMAGE_TAG}
 
           kubectl -n ${K8S_NAMESPACE} rollout status deployment/frontend --timeout=180s
           kubectl -n ${K8S_NAMESPACE} rollout status deployment/backend --timeout=180s
