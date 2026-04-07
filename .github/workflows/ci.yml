@@ -53,7 +53,7 @@ jobs:
       - name: Sync backend dependencies
         run: uv sync --locked
       - name: Check backend dependency consistency
-        run: .venv/bin/pip check
+        run: uv pip check --python .venv/bin/python
       - name: Compile backend application
         run: uv run --locked python -m compileall app
       - name: Import FastAPI app

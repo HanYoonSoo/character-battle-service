@@ -36,7 +36,7 @@ Minimal local verification commands:
 
 - `UV_CACHE_DIR=/tmp/uv-cache uv lock --check`
 - `UV_CACHE_DIR=/tmp/uv-cache uv sync --locked`
-- `.venv/bin/pip check`
+- `uv pip check --python .venv/bin/python`
 - `uv run --locked python -m compileall app`
 - `uv run --locked python -c "from app.main import app; print(app.title)"`
 

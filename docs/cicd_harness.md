@@ -48,7 +48,7 @@ Behavior:
 1. repository policy checks
 2. sensitive data scan (tokens and private key material)
 3. frontend dependency install and production build verification
-4. backend `uv.lock` freshness check, locked sync, `pip check`, and runtime import verification
+4. backend `uv.lock` freshness check, locked sync, `uv pip check`, and runtime import verification
 5. lint and formatting checks
 6. unit tests
 7. API contract checks
@@ -62,7 +62,7 @@ Behavior:
 Current deterministic dependency gates:
 
 - frontend: `npm ci` then `npm run build`
-- backend: `uv lock --check`, `uv sync --locked`, `.venv/bin/pip check`, `uv run --locked python -m compileall app`, `uv run --locked python -c "from app.main import app; print(app.title)"`
+- backend: `uv lock --check`, `uv sync --locked`, `uv pip check --python .venv/bin/python`, `uv run --locked python -m compileall app`, `uv run --locked python -c "from app.main import app; print(app.title)"`
 
 Local developer counterpart:
 

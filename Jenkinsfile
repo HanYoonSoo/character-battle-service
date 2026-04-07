@@ -57,7 +57,7 @@ pipeline {
           sh '.uv-bootstrap/bin/pip install uv==0.11.3'
           sh '.uv-bootstrap/bin/uv lock --check'
           sh '.uv-bootstrap/bin/uv sync --locked'
-          sh '.venv/bin/pip check'
+          sh '.uv-bootstrap/bin/uv pip check --python .venv/bin/python'
           sh '.uv-bootstrap/bin/uv run --locked python -m compileall app'
           sh '.uv-bootstrap/bin/uv run --locked python -c "from app.main import app; print(app.title)"'
         }
